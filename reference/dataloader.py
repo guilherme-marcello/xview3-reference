@@ -108,18 +108,20 @@ def process_scene(
         else:
             os.makedirs(temp_folder, exist_ok=True)
         src = rasterio.open(files[fl])
-        imgs[fl] = src.read(1)
+        img = src.read(1)
+        imgs[fl] = img
 
         # If not same size as first channel, resample before chipping
         # to ensure chips from different channels are co-registered
         if not imgs[fl].shape == imgs[channels[0]].shape:
-            imgs[fl] = src.read(
+            img = src.read(
                 out_shape=(
                     imgs[channels[0]].shape[0],
                     imgs[channels[0]].shape[1],
                 ),
                 resampling=Resampling.bilinear,
             ).squeeze()
+            imgs[fl] = img
         try:
             assert imgs[fl].shape == imgs[channels[0]].shape
         except AssertionError as e:
@@ -129,6 +131,7 @@ def process_scene(
 
         # Pad the raster to be a multiple of the chip size
         padded_img, _, _ = pad(imgs[fl], chip_size, chip_size)
+
 
         # Get image chips and grids
         chips[fl], grids[fl] = chip_sar_img(padded_img, chip_size)
@@ -263,6 +266,8 @@ class XView3Dataset(object):
         else:
             self.scenes = scene_list
 
+        print(f"Number of scenes in {split} dataset: {len(self.scenes)}")
+
         # Get all detections; convert label schema from xView3 label file
         # to a three-class label schema that can be used by Faster R-CNN
         if detect_file:
@@ -283,8 +288,12 @@ class XView3Dataset(object):
         else:
             self.detections = None
 
+        print(f"288 Number of detections in {split} dataset: {len(self.detections)}")
+
         # Get chip-level detection coordinates
         self.pixel_detections = self.chip_and_get_pixel_detections()
+
+        print(f"289 Number of chip-level detections: {len(self.pixel_detections)}")
 
         # Add background chips for negative sampling
         if self.background_frac and (self.detections is not None):
@@ -547,6 +556,8 @@ class XView3Dataset(object):
         were to be appropriately modified
         """
 
+        print("Chipping scenes and getting pixel-level detections...")
+
         start = time.time()
         if self.num_workers > 1:
             ray.init()
@@ -575,6 +586,7 @@ class XView3Dataset(object):
         else:
             # Otherwise, just use a for loop
             chip_detects = []
+            print("Not using parallelization...")
 
             for jj, scene_id in enumerate(self.scenes):
                 print(f"Processing scene {jj} of {len(self.scenes)}...")
